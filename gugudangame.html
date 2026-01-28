@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>구구단겜</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // SVG 아이콘 컴포넌트 직접 정의
+        const Icons = {
+            Play: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            ),
+            RotateCcw: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            ),
+            Timer: ({ className }) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="10" y1="2" x2="14" y2="2"></line><line x1="12" y1="14" x2="15" y2="11"></line><circle cx="12" cy="14" r="8"></circle></svg>
+            ),
+            Check: ({ size = 24, className = "" }) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"></polyline></svg>
+            ),
+            X: ({ size = 24, className = "" }) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            ),
+            Delete: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+            )
+        };
+
+        function App() {
+            const [gameState, setGameState] = useState('menu');
+            const [score, setScore] = useState(0);
+            const [selectedTime, setSelectedTime] = useState(60); // 기본 시간 설정
+            const [timeLeft, setTimeLeft] = useState(60);
+            const [problem, setProblem] = useState({ num1: 2, num2: 2 });
+            const [input, setInput] = useState('');
+            const [combo, setCombo] = useState(0);
+            const [highScore, setHighScore] = useState(0);
+            const [feedback, setFeedback] = useState(null);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('gugudan_highscore');
+                if (saved) setHighScore(parseInt(saved, 10));
+            }, []);
+
+            useEffect(() => {
+                let timer;
+                if (gameState === 'playing' && timeLeft > 0) {
+                    timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+                } else if (timeLeft === 0 && gameState === 'playing') {
+                    setGameState('finished');
+                    if (score > highScore) {
+                        setHighScore(score);
+                        localStorage.setItem('gugudan_highscore', score);
+                    }
+                }
+                return () => clearInterval(timer);
+            }, [gameState, timeLeft]);
+
+            const generateProblem = () => {
+                setProblem({
+                    num1: Math.floor(Math.random() * 8) + 2,
+                    num2: Math.floor(Math.random() * 9) + 1
+                });
+                setInput('');
+            };
+
+            const startGame = () => {
+                setScore(0); 
+                setTimeLeft(selectedTime); 
+                setCombo(0); 
+                setFeedback(null);
+                setGameState('playing'); 
+                generateProblem();
+            };
+
+            const checkAnswer = () => {
+                const answer = parseInt(input);
+                if (answer === problem.num1 * problem.num2) {
+                    setScore(prev => prev + 10 + Math.floor(combo / 5) * 2);
+                    setCombo(prev => prev + 1);
+                    setFeedback('correct');
+                    setTimeout(() => setFeedback(null), 500);
+                    generateProblem();
+                } else {
+                    setCombo(0);
+                    setFeedback('wrong');
+                    setInput('');
+                    setTimeLeft(prev => Math.max(0, prev - 3));
+                    setTimeout(() => setFeedback(null), 500);
+                }
+            };
+
+            const handleInput = (val) => {
+                if (gameState !== 'playing') return;
+                if (val === 'backspace') setInput(prev => prev.slice(0, -1));
+                else if (val === 'enter') { if (input) checkAnswer(); }
+                else if (input.length < 3) setInput(prev => prev + val);
+            };
+
+            if (gameState === 'menu') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4 text-white">
+                        <div className="bg-white/10 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-md text-center border border-white/20">
+                            <h1 className="text-4xl font-black mb-2">🚀 구구단겜</h1>
+                            <p className="text-indigo-100 mb-6">제한 시간 안에 최대한 많이 맞혀보세요!</p>
+                            
+                            <div className="bg-white/20 rounded-xl p-4 mb-6">
+                                <p className="text-yellow-300 font-bold mb-1 text-sm">최고 점수</p>
+                                <p className="text-4xl font-black">{highScore}점</p>
+                            </div>
+
+                            <div className="mb-8">
+                                <p className="text-sm font-bold mb-3 text-indigo-100">시간 선택</p>
+                                <div className="flex gap-2 justify-center">
+                                    {[30, 60, 90].map(time => (
+                                        <button 
+                                            key={time}
+                                            onClick={() => setSelectedTime(time)}
+                                            className={`flex-1 py-2 rounded-xl font-bold transition-all ${selectedTime === time ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                                        >
+                                            {time}초
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button onClick={startGame} className="w-full bg-white text-indigo-600 font-bold py-4 rounded-full text-xl shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2">
+                                <Icons.Play /> 게임 시작
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (gameState === 'finished') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4 text-white">
+                        <div className="bg-white/10 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-md text-center border border-white/20">
+                            <h2 className="text-3xl font-bold mb-6">게임 종료!</h2>
+                            <p className="text-6xl font-black mb-4">{score}점</p>
+                            {score >= highScore && score > 0 && <p className="text-yellow-300 font-bold mb-6 animate-bounce">🏆 신기록 달성!</p>}
+                            <div className="flex gap-3">
+                                <button onClick={() => setGameState('menu')} className="flex-1 bg-white/20 py-3 rounded-xl font-bold">메뉴로</button>
+                                <button onClick={startGame} className="flex-[2] bg-white text-indigo-600 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
+                                    <Icons.RotateCcw /> 다시 도전
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+                        <div className="bg-indigo-600 text-white p-6 rounded-b-[2rem]">
+                            <div className="flex justify-between items-center">
+                                <div className="bg-indigo-700/50 px-4 py-2 rounded-full font-mono font-bold text-xl flex items-center gap-2">
+                                    <Icons.Timer className={timeLeft <= 10 ? 'animate-pulse text-red-300' : ''} />
+                                    <span className={timeLeft <= 10 ? 'text-red-300' : ''}>{timeLeft}s</span>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs opacity-70 uppercase">Score</p>
+                                    <p className="text-2xl font-black">{score}</p>
+                                </div>
+                            </div>
+                            <div className="h-6 text-center mt-2">
+                                {combo > 1 && <span className="text-yellow-300 font-bold italic animate-pulse">🔥 {combo} COMBO!</span>}
+                            </div>
+                        </div>
+
+                        <div className="p-8 text-center relative">
+                            {feedback === 'correct' && <div className="absolute inset-0 flex items-center justify-center text-green-500 opacity-20 animate-ping"><Icons.Check size={120} /></div>}
+                            {feedback === 'wrong' && <div className="absolute inset-0 flex items-center justify-center text-red-500 opacity-20 animate-pulse"><Icons.X size={120} /></div>}
+                            <div className="text-6xl font-black text-slate-700 mb-8">{problem.num1} × {problem.num2}</div>
+                            <div className={`w-32 h-16 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center border-4 ${feedback === 'wrong' ? 'border-red-400 bg-red-50' : feedback === 'correct' ? 'border-green-400 bg-green-50' : 'border-slate-200'} text-3xl font-bold transition-colors`}>
+                                {input || '?'}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-6 grid grid-cols-3 gap-3">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'backspace', 0, 'enter'].map((key) => (
+                                <button
+                                    key={key}
+                                    onClick={() => handleInput(key.toString())}
+                                    className={`py-4 rounded-xl text-xl font-bold shadow-sm active:translate-y-1 transition-all flex items-center justify-center ${
+                                        key === 'enter' ? 'bg-indigo-500 text-white' : 
+                                        key === 'backspace' ? 'bg-red-50 text-red-500' : 'bg-white text-slate-700'
+                                    }`}
+                                >
+                                    {key === 'backspace' ? <Icons.Delete /> : key === 'enter' ? <Icons.Check size={28} /> : key}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
